@@ -20,16 +20,25 @@ function LoginView() {
       password: '',
     },
     onSubmit: async ({ value }) => {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: value.email,
-        password: value.password,
-      });
-      if (data.session) {
-        setSession(data.session);
-        navigate({ to: '/' });
-      } else {
-        console.error(error);
-        alert(error?.message);
+      try {
+        if (!import.meta.env.VITE_SUPABASE_URL) {
+          alert('Supabase is not configured! Please set VITE_SUPABASE_URL in your environment variables.');
+          return;
+        }
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: value.email,
+          password: value.password,
+        });
+        if (error) {
+          throw error;
+        }
+        if (data.session) {
+          setSession(data.session);
+          navigate({ to: '/' });
+        }
+      } catch (err: any) {
+        console.error('Sign in error:', err);
+        alert(err?.message || 'An error occurred during sign in.');
       }
     },
   });
