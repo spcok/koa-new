@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
 import { Calendar as CalendarIcon, ArrowUpDown, Plus } from 'lucide-react';
 import { AddAnimalModal } from '../../animals/components/AddAnimalModal';
+import { useDashboardStore } from '../../../store/dashboardStore';
 
 export function DashboardToolbar() {
   const [isAddAnimalModalOpen, setIsAddAnimalModalOpen] = useState(false);
+  const { viewingDate, sortOrder, shiftDate, resetToToday, toggleSortOrder } = useDashboardStore();
+
+  const formattedDate = viewingDate.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
 
   return (
     <>
@@ -14,18 +22,18 @@ export function DashboardToolbar() {
         </div>
         
         <div className="flex items-center bg-white border border-slate-200 rounded-md shadow-sm overflow-hidden text-xs">
-          <button className="px-3 py-1.5 border-r border-slate-200 hover:bg-slate-50 font-medium text-slate-700">← Prev</button>
-          <span className="px-4 py-1.5 font-semibold text-slate-800">19/04/2026</span>
+          <button onClick={() => shiftDate(-1)} className="px-3 py-1.5 border-r border-slate-200 hover:bg-slate-50 font-medium text-slate-700">← Prev</button>
+          <span className="px-4 py-1.5 font-semibold text-slate-800">{formattedDate}</span>
           <button className="px-3 py-1.5 border-l border-r border-slate-200 hover:bg-slate-50"><CalendarIcon className="w-3.5 h-3.5 text-slate-500" /></button>
-          <button className="px-3 py-1.5 border-r border-slate-200 hover:bg-slate-50 font-medium text-slate-700">Next →</button>
-          <button className="px-3 py-1.5 hover:bg-slate-50 font-medium text-slate-700">Today</button>
+          <button onClick={() => shiftDate(1)} className="px-3 py-1.5 border-r border-slate-200 hover:bg-slate-50 font-medium text-slate-700">Next →</button>
+          <button onClick={() => resetToToday()} className="px-3 py-1.5 hover:bg-slate-50 font-medium text-slate-700">Today</button>
         </div>
 
         <div className="h-6 w-px bg-slate-200 mx-2"></div>
 
-        <button className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-md shadow-sm text-xs font-semibold text-slate-700 hover:bg-slate-50">
+        <button onClick={toggleSortOrder} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-md shadow-sm text-xs font-semibold text-slate-700 hover:bg-slate-50">
           <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
-          Name (A-Z)
+          Name ({sortOrder === 'asc' ? 'A-Z' : 'Z-A'})
         </button>
 
         <button 
