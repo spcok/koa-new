@@ -64,5 +64,42 @@ CREATE TABLE IF NOT EXISTS animals (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS daily_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  animal_id uuid NOT NULL,
+  log_type text NOT NULL,
+  log_date timestamp with time zone NOT NULL,
+  notes text,
+  weight_grams numeric,
+  weight_unit text,
+  basking_temp_c numeric,
+  cool_temp_c numeric,
+  temperature_c numeric,
+  is_deleted boolean NOT NULL DEFAULT false,
+  created_by uuid,
+  modified_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS feeding_schedules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  animal_id uuid NOT NULL,
+  scheduled_date date NOT NULL,
+  food_type text NOT NULL,
+  quantity numeric NOT NULL,
+  calci_dust boolean NOT NULL DEFAULT false,
+  additional_notes text,
+  is_completed boolean NOT NULL DEFAULT false,
+  completed_at timestamp with time zone,
+  completed_by uuid,
+  is_deleted boolean NOT NULL DEFAULT false,
+  created_by uuid,
+  modified_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
   `);
 };
+

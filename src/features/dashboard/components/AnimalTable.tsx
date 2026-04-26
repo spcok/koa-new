@@ -1,24 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { db } from '../../../lib/db';
-import { useDashboardStore } from '../../../store/dashboardStore';
-
-const tabs = ['Owls', 'Raptors', 'Mammals', 'Exotics', 'Archived'];
+import { useDashboardStore, CategoryFilter } from '../../../store/dashboardStore';
 
 export function AnimalTable() {
-  const { sortOrder } = useDashboardStore();
+  const { sortOrder, categoryFilter, setCategoryFilter } = useDashboardStore();
   const [animals, setAnimals] = useState<any[]>([]);
 
   useEffect(() => {
+    let whereClause = 'WHERE archived = false';
+    let params: any[] = [];
+
+    if (categoryFilter === 'ARCHIVED') {
+      whereClause = 'WHERE archived = true';
+    } else if (categoryFilter !== 'ALL') {
+      whereClause = 'WHERE category = $1 AND archived = false';
+      params.push(categoryFilter);
+    }
+
     const query = `
       SELECT id, name, species, location, gender, hazard_rating, flying_weight_g, ring_number 
       FROM animals 
+      ${whereClause}
       ORDER BY name ${sortOrder === 'asc' ? 'ASC' : 'DESC'}
     `;
 
     let unsubscribe: () => Promise<void>;
 
-    db.live.query(query, [], (results) => {
+    db.live.query(query, params, (results) => {
       setAnimals(results.rows);
     }).then((res) => {
       unsubscribe = res.unsubscribe;
@@ -31,28 +40,21 @@ export function AnimalTable() {
         unsubscribe();
       }
     };
-  }, [sortOrder]);
+  }, [sortOrder, categoryFilter]);
+
+  const currentTabLabel = categoryFilter === 'ALL' ? 'All' : 
+    categoryFilter === 'OWL' ? 'Owls' : 
+    categoryFilter === 'RAPTOR' ? 'Raptors' : 
+    categoryFilter === 'MAMMAL' ? 'Mammals' : 
+    categoryFilter === 'EXOTICS' ? 'Exotics' : 'Archived';
 
   return (
     <div className="flex flex-col gap-6 mt-4">
-      {/* Tabs */}
-      <div className="flex items-center justify-between text-sm font-semibold text-slate-500 bg-white/50 rounded-full border border-slate-200 overflow-hidden shadow-sm p-1">
-        {tabs.map((tab, idx) => (
-          <button
-            key={tab}
-            className={clsx(
-              "flex-1 py-2 text-center rounded-full transition-colors",
-              idx === 0 ? "bg-white text-slate-800 shadow-sm border border-slate-200" : "hover:bg-white/50"
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
       <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-5 border-b border-slate-200">
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">Your Owls</h2>
+          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+            {currentTabLabel === 'All' ? 'Your Animals' : `Your ${currentTabLabel}`}
+          </h2>
         </div>
         
         {animals.length === 0 ? (
