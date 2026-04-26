@@ -19,6 +19,7 @@
     "@tanstack/react-router": "^1.168.24",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.24",
+    "@tanstack/zod-form-adapter": "^0.42.1",
     "@vitejs/plugin-react": "^5.0.4",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
