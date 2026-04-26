@@ -2,6 +2,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 import { useForm } from '@tanstack/react-form';
 import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
+import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { Route as rootRoute } from './__root';
 import { Loader2 } from 'lucide-react';
@@ -34,32 +35,25 @@ function LoginView() {
       onChange: loginSchema,
     },
     onSubmit: async ({ value }) => {
-      setAuthError(null);
-      // Simulate network request
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      if (value.email !== 'admin@koa.com') {
-        setAuthError("Invalid credentials. Please try again.");
-        return;
-      }
-      
-      // Success
-      setSession({
-        access_token: 'fake',
-        refresh_token: 'fake',
-        expires_in: 3600,
-        token_type: 'bearer',
-        user: {
-          id: 'admin_1',
-          app_metadata: {},
-          user_metadata: {},
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-          email: 'admin@koa.com'
+      try {
+        setAuthError(null);
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: value.email,
+          password: value.password,
+        });
+        
+        if (error) {
+          setAuthError(error.message);
+          return;
         }
-      } as any);
-
-      navigate({ to: '/' });
+        
+        if (data.session) {
+          setSession(data.session);
+          navigate({ to: '/' });
+        }
+      } catch (err: any) {
+        setAuthError(err?.message || 'An error occurred during sign in.');
+      }
     },
   });
 

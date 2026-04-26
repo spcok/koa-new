@@ -1,6 +1,11 @@
 import { PGlite } from '@electric-sql/pglite';
+import { live } from '@electric-sql/pglite/live';
 
-export const db = new PGlite('idb://koa-local-db');
+export const db = new PGlite('idb://koa-local-db', {
+  extensions: {
+    live,
+  }
+});
 
 export const initDb = async () => {
   await db.exec(`

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { z } from 'zod';
 import { X } from 'lucide-react';
+import { db } from '../../../lib/db';
 
 const formSchema = z.object({
   // Core ID
@@ -141,6 +142,29 @@ export function AddAnimalModal({ isOpen, onClose, initialData }: AddAnimalModalP
         if (payload.critical_husbandry_notes.length === 0) payload.critical_husbandry_notes = ['none'];
 
         console.log('Final Prepared Payload:', payload);
+        
+        await db.query(`
+          INSERT INTO animals (
+            entity_type, parent_mob_id, census_count, name, species, latin_name, category, location, image_url, distribution_map_url, 
+            hazard_rating, is_venomous, weight_unit, flying_weight_g, winter_weight_g, average_target_weight, date_of_birth, is_dob_unknown, gender, 
+            microchip_id, ring_number, has_no_id, red_list_status, description, special_requirements, critical_husbandry_notes, ambient_temp_only, target_day_temp_c, 
+            target_night_temp_c, water_tipping_temp, target_humidity_min_percent, target_humidity_max_percent, misting_frequency, acquisition_date, acquisition_type, origin, 
+            origin_location, lineage_unknown, sire_id, dam_id, is_boarding, is_quarantine, display_order
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, 
+            $20, $21, $22, $23, $24, $25, $26, $27, $28, 
+            $29, $30, $31, $32, $33, $34, $35, $36, 
+            $37, $38, $39, $40, $41, $42, $43
+          ) RETURNING *;
+        `, [
+          payload.entity_type, payload.parent_mob_id, payload.census_count, payload.name, payload.species, payload.latin_name, payload.category, payload.location, '-1', null,
+          payload.hazard_rating, payload.is_venomous, payload.weight_unit, payload.flying_weight_g, payload.winter_weight_g, payload.average_target_weight, payload.date_of_birth, payload.is_dob_unknown, payload.gender,
+          payload.microchip_id, payload.ring_number, payload.has_no_id, payload.red_list_status, payload.description, payload.special_requirements, payload.critical_husbandry_notes, payload.ambient_temp_only, payload.target_day_temp_c,
+          payload.target_night_temp_c, payload.water_tipping_temp_c, payload.target_humidity_min, payload.target_humidity_max, payload.misting_frequency, payload.acquisition_date, payload.acquisition_type, payload.origin,
+          payload.origin_location, payload.lineage_unknown, payload.sire_id, payload.dam_id, payload.is_boarding, payload.is_quarantine, payload.display_order
+        ]);
+
         onClose();
       } catch (error) {
         console.error('Validation Error:', error);
