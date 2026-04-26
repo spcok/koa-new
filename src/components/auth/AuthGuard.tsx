@@ -1,3 +1,4 @@
+import React from 'react';
 import { Navigate, useLocation } from '@tanstack/react-router';
 import { useAuthStore } from '../../store/authStore';
 
