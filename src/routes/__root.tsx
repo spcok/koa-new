@@ -1,5 +1,7 @@
 import { createRootRoute, Outlet, useLocation } from '@tanstack/react-router';
 import { AuthGuard } from '../components/auth/AuthGuard';
+import { useEffect } from 'react';
+import { initDb } from '../lib/db';
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -7,6 +9,10 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   const location = useLocation();
+
+  useEffect(() => {
+    initDb().catch(console.error);
+  }, []);
 
   if (location.pathname === '/login') {
     return (
