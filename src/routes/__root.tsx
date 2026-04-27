@@ -15,6 +15,23 @@ function RootComponent() {
   const { pullFromCloud } = useSyncStore();
 
   useEffect(() => {
+    // Run initial sync on app load
+    useSyncStore.getState().syncAll().catch(console.error);
+
+    // Initialize realtime subscription
+    useSyncStore.getState().initRealtimeSubscription();
+
+    // Listen for network reconnection
+    const handleOnline = () => {
+      console.log('Network restored: Triggering background sync...');
+      useSyncStore.getState().syncAll().catch(console.error);
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
+  useEffect(() => {
     initDb().catch(console.error);
   }, []);
 

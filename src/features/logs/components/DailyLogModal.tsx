@@ -3,6 +3,7 @@ import { useForm } from '@tanstack/react-form';
 import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
 import { db } from '../../../lib/db';
+import { useSyncStore } from '../../../store/syncStore';
 import { X, Trash2 } from 'lucide-react';
 import { convertToGrams, convertFromGrams } from '../../../lib/weightUtils';
 
@@ -122,6 +123,7 @@ function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData, a
     validatorAdapter: zodValidator,
     defaultValues: initialData,
     onSubmit: async ({ value }) => {
+      console.log('1. Raw Form Value:', value);
       setLoading(true);
       try {
         const finalAnimalId = animalId || '00000000-0000-0000-0000-000000000000';
@@ -144,19 +146,28 @@ function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData, a
         const zeroUUID = '00000000-0000-0000-0000-000000000000';
 
         if (existingLogId) {
+          const params = [finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, finalMisted, finalWater, zeroUUID, existingLogId];
+          console.log('2. SQL Parameter Array (Update):', params);
           await db.query(
             `UPDATE daily_logs SET log_type = $1, log_date = $2, notes = $3, weight_grams = $4, weight_unit = $5, basking_temp_c = $6, cool_temp_c = $7, temperature_c = $8, food = $9, quantity = $10, feed_time = $11, feed_method = $12, cast_status = $13, misted = $14, water = $15, updated_at = now(), modified_by = $16 WHERE id = $17`,
-            [finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, finalMisted, finalWater, zeroUUID, existingLogId]
+            params
           );
         } else {
+          const params = [finalAnimalId, finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, finalMisted, finalWater, zeroUUID];
+          console.log('2. SQL Parameter Array (Insert):', params);
           await db.query(
             `INSERT INTO daily_logs (animal_id, log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c, food, quantity, feed_time, feed_method, cast_status, misted, water, created_at, updated_at, created_by, modified_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now(), now(), $17, $17)`,
-            [finalAnimalId, finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, finalMisted, finalWater, zeroUUID]
+            params
           );
         }
+        console.log('3. SUCCESS: DB Query Executed');
+        // Trigger background sync
+        useSyncStore.getState().pushToCloud().catch(console.error);
+        
         onClose();
       } catch (err) {
-        console.error('Mutation error:', err);
+        console.error('CRITICAL SQL ERROR:', err);
+        alert('Database Error: Check console');
       } finally {
         setLoading(false);
       }
