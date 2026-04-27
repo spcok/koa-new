@@ -1,5 +1,10 @@
-import { createRoute, Link } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
+import { useQuery } from '@tanstack/react-query';
+import { db } from '../lib/db';
+import { DailyLogModal } from '../features/logs/components/DailyLogModal';
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
@@ -7,104 +12,117 @@ export const Route = createRoute({
   component: DailyLogPage,
 });
 
-import { createRoute } from '@tanstack/react-router';
-import { Route as rootRoute } from './__root';
-import { useState } from 'react';
-import { useLiveQuery } from '@electric-sql/pglite-react';
-import { db } from '../lib/db';
-import { DailyLogModal } from '../features/logs/components/DailyLogModal';
-
-export const Route = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/daily-logs',
-  component: DailyLogs,
-});
-
-function DailyLogs() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedCategory, setSelectedCategory] = useState('All');
+function DailyLogPage() {
+  const [viewDate, setViewDate] = useState(new Date().toISOString().slice(0, 10));
+  const [activeCategory, setActiveCategory] = useState('Owls');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingLogId, setEditingLogId] = useState<string | undefined>();
-  const [selectedAnimalId, setSelectedAnimalId] = useState<string>('00000000-0000-0000-0000-000000000000');
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string | null>(null);
+  const [selectedLogType, setSelectedLogType] = useState<string | null>(null);
+  const [existingLogId, setExistingLogId] = useState<string | undefined>();
 
-  const liveQuery = useLiveQuery(
-    `SELECT l.*, a.name as animal_name, a.category as animal_category
-     FROM daily_logs l
-     LEFT JOIN animals a ON l.animal_id = a.id
-     WHERE DATE(l.log_date) = $1 AND l.is_deleted = false
-     ORDER BY l.updated_at DESC`,
-    [selectedDate],
-    db
-  );
+  const logsQuery = useQuery({
+    queryKey: ['dailyLogs', viewDate],
+    queryFn: async () => {
+      const animalsRes = await db.query('SELECT * FROM animals ORDER BY name ASC');
+      const logsRes = await db.query('SELECT * FROM daily_logs WHERE DATE(log_date) = $1', [viewDate]);
+      return { animals: animalsRes.rows, logs: logsRes.rows };
+    },
+  });
 
-  const logs = liveQuery?.rows || [];
+  const categories = ['Owls', 'Raptors', 'Mammals', 'Exotics'];
+  
+  const handlePrevDay = () => {
+    const d = new Date(viewDate);
+    d.setDate(d.getDate() - 1);
+    setViewDate(d.toISOString().slice(0, 10));
+  };
+  const handleNextDay = () => {
+    const d = new Date(viewDate);
+    d.setDate(d.getDate() + 1);
+    setViewDate(d.toISOString().slice(0, 10));
+  };
 
-  const filteredLogs = logs.filter(log =>
-    selectedCategory === 'All' || (log as any).animal_category === selectedCategory
-  );
+  const filteredAnimals = logsQuery.data?.animals.filter(a => a.category === activeCategory) || [];
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <header className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Daily Logs</h1>
-          <p className="text-slate-500">Log and track daily animal activities.</p>
+      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+        <div className="flex items-center gap-2">
+            <button onClick={handlePrevDay} className="p-2 hover:bg-slate-100 rounded"><ChevronLeft size={20}/></button>
+            <div className="flex items-center gap-2 px-3 py-2 border rounded font-mono text-sm text-slate-600">
+                <Calendar size={16}/>{viewDate}
+            </div>
+            <button onClick={handleNextDay} className="p-2 hover:bg-slate-100 rounded"><ChevronRight size={20}/></button>
         </div>
-        <button
-           onClick={() => { setEditingLogId(undefined); setIsModalOpen(true); }}
-           className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-semibold"
-        >
-           Add Log
-        </button>
-      </header>
-
-      <div className="flex gap-4">
-         <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-white p-2 rounded border border-slate-300" />
-         <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="bg-white p-2 rounded border border-slate-300">
-           {['All', 'Mammals', 'Birds', 'Reptiles', 'Amphibians', 'Invertebrates', 'Fish'].map(c => <option key={c} value={c}>{c}</option>)}
-         </select>
+        <div className="flex gap-2">
+            {categories.map(cat => (
+                <button 
+                    key={cat} 
+                    onClick={() => setActiveCategory(cat)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium ${activeCategory === cat ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                    {cat}
+                </button>
+            ))}
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded border border-slate-200">
-        <table className="w-full text-sm text-left">
-           <thead className="bg-slate-100 uppercase text-xs">
-             <tr>
-               <th className="px-4 py-2">Time</th>
-               <th className="px-4 py-2">Animal</th>
-               <th className="px-4 py-2">Type</th>
-               <th className="px-4 py-2">Value</th>
-               <th className="px-4 py-2">Notes</th>
-               <th className="px-4 py-2">Actions</th>
-             </tr>
-           </thead>
-           <tbody>
-             {filteredLogs.map(log => {
-                 const l = log as any;
-                 return (
-                    <tr key={l.id} className="border-b">
-                      <td className="px-4 py-2">{new Date(l.log_date).toLocaleTimeString()}</td>
-                      <td className="px-4 py-2">{l.animal_name}</td>
-                      <td className="px-4 py-2">{l.log_type}</td>
-                      <td className="px-4 py-2">{l.weight_grams !== -1 ? `${l.weight_grams} g` : l.temperature_c !== -1 ? `${l.temperature_c} °C` : '-'}</td>
-                      <td className="px-4 py-2">{l.notes}</td>
-                      <td className="px-4 py-2">
-                        <button onClick={() => { setEditingLogId(l.id); setIsModalOpen(true); }} className="text-emerald-700 font-bold">Edit</button>
-                      </td>
-                    </tr>
-                 )
-             })}
-           </tbody>
+      <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm bg-white">
+        <table className="w-full text-left text-sm text-slate-700">
+          <thead className="text-xs uppercase bg-slate-50 border-b">
+            <tr>
+              <th className="px-6 py-4">Animal</th>
+              {activeCategory === 'Exotics' ? (
+                <>
+                    <th className="px-6 py-4">Feed</th>
+                    <th className="px-6 py-4">Misting</th>
+                    <th className="px-6 py-4">Env</th>
+                </>
+              ) : (
+                <>
+                    <th className="px-6 py-4">WT</th>
+                    <th className="px-6 py-4">Feed</th>
+                    <th className="px-6 py-4">Env</th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAnimals.map(animal => {
+               const animalLogs = logsQuery.data?.logs.filter(l => l.animal_id === animal.id) || [];
+               return (
+                <tr key={animal.id} className="border-b hover:bg-slate-50">
+                    <td className="px-6 py-4 font-medium">{animal.name}</td>
+                    {activeCategory === 'Exotics' ? (
+                        <>
+                            <td className="px-6 py-4 cursor-pointer hover:underline" onClick={() => { setSelectedAnimalId(animal.id); setSelectedLogType('feed'); setExistingLogId(animalLogs.find(l => l.log_type === 'feed')?.id); setIsModalOpen(true); }}>Feed</td>
+                            <td className="px-6 py-4 cursor-pointer hover:underline" onClick={() => { setSelectedAnimalId(animal.id); setSelectedLogType('misting'); setExistingLogId(animalLogs.find(l => l.log_type === 'misting')?.id); setIsModalOpen(true); }}>Misting</td>
+                            <td className="px-6 py-4 cursor-pointer hover:underline" onClick={() => { setSelectedAnimalId(animal.id); setSelectedLogType('general'); setExistingLogId(animalLogs.find(l => l.log_type === 'general')?.id); setIsModalOpen(true); }}>Env</td>
+                        </>
+                    ) : (
+                        <>
+                             <td className="px-6 py-4 cursor-pointer hover:underline" onClick={() => { setSelectedAnimalId(animal.id); setSelectedLogType('weight'); setExistingLogId(animalLogs.find(l => l.log_type === 'weight')?.id); setIsModalOpen(true); }}>WT</td>
+                             <td className="px-6 py-4 cursor-pointer hover:underline" onClick={() => { setSelectedAnimalId(animal.id); setSelectedLogType('feed'); setExistingLogId(animalLogs.find(l => l.log_type === 'feed')?.id); setIsModalOpen(true); }}>Feed</td>
+                             <td className="px-6 py-4 cursor-pointer hover:underline" onClick={() => { setSelectedAnimalId(animal.id); setSelectedLogType('general'); setExistingLogId(animalLogs.find(l => l.log_type === 'general')?.id); setIsModalOpen(true); }}>Env</td>
+                        </>
+                    )}
+                </tr>
+               )
+            })}
+          </tbody>
         </table>
       </div>
-
-      <DailyLogModal
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingLogId(undefined); }}
-        animalId={selectedAnimalId}
-        existingLogId={editingLogId}
-      />
+      
+      {selectedAnimalId && (
+        <DailyLogModal
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); logsQuery.refetch(); }}
+          animalId={selectedAnimalId}
+          existingLogId={existingLogId}
+          initialType={selectedLogType || 'general'}
+        />
+      )}
     </div>
   );
 }
-
 
