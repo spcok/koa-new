@@ -36,12 +36,12 @@ export function DailyLogModal({ isOpen, onClose, animalId, existingLogId, initia
     defaultValues: {
       log_type: (initialType || 'general') as any,
       log_date: new Date().toISOString().slice(0, 16),
-      notes: null,
-      weight_grams: null,
+      notes: 'NONE',
+      weight_grams: -1,
       weight_unit: 'g',
-      basking_temp_c: null,
-      cool_temp_c: null,
-      temperature_c: null,
+      basking_temp_c: -1,
+      cool_temp_c: -1,
+      temperature_c: -1,
     },
     onSubmit: async ({ value }) => {
       setLoading(true);
@@ -50,12 +50,12 @@ export function DailyLogModal({ isOpen, onClose, animalId, existingLogId, initia
           animalId,
           value.log_type,
           value.log_date,
-          value.notes || null,
-          value.weight_grams ?? null,
-          value.weight_unit ?? null,
-          value.basking_temp_c ?? null,
-          value.cool_temp_c ?? null,
-          value.temperature_c ?? null,
+          value.notes || 'NONE',
+          value.weight_grams ?? -1,
+          value.weight_unit ?? 'g',
+          value.basking_temp_c ?? -1,
+          value.cool_temp_c ?? -1,
+          value.temperature_c ?? -1,
         ];
 
         if (existingLogId) {
@@ -120,13 +120,13 @@ export function DailyLogModal({ isOpen, onClose, animalId, existingLogId, initia
           <form.Field name="log_date" children={(field) => (
             <div>
               <label className="block text-sm mb-1 text-slate-400">Date</label>
-              <input type="datetime-local" {...field.getInputProps()} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
+              <input type="datetime-local" name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
             </div>
           )} />
           <form.Field name="log_type" children={(field) => (
             <div>
               <label className="block text-sm mb-1 text-slate-400">Type</label>
-              <select {...field.getInputProps()} className="w-full bg-slate-800 p-2 rounded border border-slate-700">
+              <select name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700">
                 {LOG_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
               </select>
             </div>
@@ -140,7 +140,7 @@ export function DailyLogModal({ isOpen, onClose, animalId, existingLogId, initia
                     <form.Field name="weight_grams" children={(field) => (
                       <div>
                         <label className="block text-sm mb-1 text-slate-400">Weight (grams)</label>
-                        <input type="number" {...field.getInputProps({type: 'number', valueAsNumber: true})} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
+                        <input type="number" name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.valueAsNumber)} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
                       </div>
                     )} />
                   </>
@@ -150,7 +150,7 @@ export function DailyLogModal({ isOpen, onClose, animalId, existingLogId, initia
                     <form.Field name="temperature_c" children={(field) => (
                       <div>
                         <label className="block text-sm mb-1 text-slate-400">Temperature (°C)</label>
-                        <input type="number" {...field.getInputProps({type: 'number', valueAsNumber: true})} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
+                        <input type="number" name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.valueAsNumber)} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
                       </div>
                     )} />
                   </>
@@ -159,7 +159,7 @@ export function DailyLogModal({ isOpen, onClose, animalId, existingLogId, initia
                   <form.Field name="notes" children={(field) => (
                     <div>
                       <label className="block text-sm mb-1 text-slate-400">Notes</label>
-                      <textarea {...field.getInputProps()} className="w-full bg-slate-800 p-2 rounded border border-slate-700 min-h-[100px]" />
+                      <textarea name={field.name} value={field.state.value || ''} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700 min-h-[100px]" />
                     </div>
                   )} />
                 )}
