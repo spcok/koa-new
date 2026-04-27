@@ -4,6 +4,7 @@ import { zodValidator } from '@tanstack/zod-form-adapter';
 import { z } from 'zod';
 import { db } from '../../../lib/db';
 import { X, Trash2 } from 'lucide-react';
+import { convertToGrams, convertFromGrams } from '../../../lib/weightUtils';
 
 const LOG_TYPES = [
   "weight", "feed", "temperature", "misting", "events", "flight", "water", "training", "general"
@@ -23,6 +24,8 @@ const formSchema = z.object({
   feed_time: z.string().nullable().optional(),
   feed_method: z.string().nullable().optional(),
   cast_status: z.string().nullable().optional(),
+  misted: z.string().nullable().optional(),
+  water: z.string().nullable().optional(),
 });
 
 interface DailyLogModalProps {
@@ -35,6 +38,7 @@ interface DailyLogModalProps {
 
 export function DailyLogModal(props: DailyLogModalProps) {
   const [isFetching, setIsFetching] = useState(!!props.existingLogId);
+  const [animalUnit, setAnimalUnit] = useState('g');
   const [initialData, setInitialData] = useState({
     log_type: (props.initialType || 'general') as any,
     log_date: new Date().toISOString().slice(0, 16),
@@ -49,15 +53,25 @@ export function DailyLogModal(props: DailyLogModalProps) {
     feed_time: '',
     feed_method: '',
     cast_status: 'N/A',
+    misted: '',
+    water: '',
+    weightValues: { g: 0, lb: 0, oz: 0, eighths: 0 },
   });
 
   useEffect(() => {
-    if (props.existingLogId && props.isOpen) {
+    async function fetchData() {
       setIsFetching(true);
-      db.query('SELECT log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c, food, quantity, feed_time, feed_method, cast_status FROM daily_logs WHERE id = $1', [props.existingLogId]).then((res) => {
+      const animalRes = await db.query('SELECT weight_unit FROM animals WHERE id = $1', [props.animalId]);
+      if (animalRes.rows.length > 0) {
+        setAnimalUnit(animalRes.rows[0].weight_unit || 'g');
+      }
+
+      if (props.existingLogId && props.isOpen) {
+        const res = await db.query('SELECT log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c, food, quantity, feed_time, feed_method, cast_status, misted, water FROM daily_logs WHERE id = $1', [props.existingLogId]);
         if (res.rows[0]) {
           const row = res.rows[0];
           const parsedDate = row.log_date ? new Date(row.log_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16);
+          const weight = row.weight_grams === -1 ? 0 : row.weight_grams;
           setInitialData({
             log_type: row.log_type,
             log_date: parsedDate,
@@ -72,22 +86,37 @@ export function DailyLogModal(props: DailyLogModalProps) {
             feed_time: row.feed_time === '00:00:00' ? "" : row.feed_time,
             feed_method: row.feed_method === 'N/A' ? "" : row.feed_method,
             cast_status: row.cast_status,
+            misted: row.misted === 'N/A' ? "" : row.misted,
+            water: row.water === 'N/A' ? "" : row.water,
+            weightValues: convertFromGrams(weight, 'g'),
           });
         }
-        setIsFetching(false);
-      });
+      }
+      setIsFetching(false);
     }
-  }, [props.existingLogId, props.isOpen]);
+    if (props.isOpen) {
+      fetchData();
+    }
+  }, [props.existingLogId, props.isOpen, props.animalId]);
 
   if (!props.isOpen) return null;
   if (isFetching) return <div className="fixed inset-0 bg-slate-900/80 flex justify-center items-center z-50 text-emerald-400 font-mono">Loading data from vault...</div>;
 
-  return <DailyLogForm {...props} initialData={initialData} />;
+  return <DailyLogForm {...props} initialData={initialData} animalUnit={animalUnit} />;
 }
 
-function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData }: DailyLogModalProps & { initialData: any }) {
+function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData, animalUnit }: DailyLogModalProps & { initialData: any, animalUnit: string }) {
   const [loading, setLoading] = useState(false);
   const [logType, setLogType] = useState(initialData.log_type);
+  const [weightValues, setWeightValues] = useState(initialData.weightValues);
+  
+  const targetUnit = animalUnit === 'lbs_oz' ? 'lb' : (animalUnit === 'oz' ? 'oz' : 'g');
+
+  const updateWeight = (newValues: typeof weightValues) => {
+    setWeightValues(newValues);
+    const grams = convertToGrams(newValues);
+    form.setFieldValue('weight_grams', grams);
+  };
 
   const form = useForm({
     validatorAdapter: zodValidator,
@@ -110,17 +139,19 @@ function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData }:
         const finalFeedTime = value.feed_time ? String(value.feed_time) : '00:00:00';
         const finalFeedMethod = value.feed_method ? String(value.feed_method).trim() : 'N/A';
         const finalCast = value.cast_status || 'N/A';
+        const finalMisted = value.misted ? String(value.misted).trim() : 'N/A';
+        const finalWater = value.water ? String(value.water).trim() : 'N/A';
         const zeroUUID = '00000000-0000-0000-0000-000000000000';
 
         if (existingLogId) {
           await db.query(
-            `UPDATE daily_logs SET log_type = $1, log_date = $2, notes = $3, weight_grams = $4, weight_unit = $5, basking_temp_c = $6, cool_temp_c = $7, temperature_c = $8, food = $9, quantity = $10, feed_time = $11, feed_method = $12, cast_status = $13, updated_at = now(), modified_by = $14 WHERE id = $15`,
-            [finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, zeroUUID, existingLogId]
+            `UPDATE daily_logs SET log_type = $1, log_date = $2, notes = $3, weight_grams = $4, weight_unit = $5, basking_temp_c = $6, cool_temp_c = $7, temperature_c = $8, food = $9, quantity = $10, feed_time = $11, feed_method = $12, cast_status = $13, misted = $14, water = $15, updated_at = now(), modified_by = $16 WHERE id = $17`,
+            [finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, finalMisted, finalWater, zeroUUID, existingLogId]
           );
         } else {
           await db.query(
-            `INSERT INTO daily_logs (animal_id, log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c, food, quantity, feed_time, feed_method, cast_status, created_at, updated_at, created_by, modified_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now(), now(), $15, $15)`,
-            [finalAnimalId, finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, zeroUUID]
+            `INSERT INTO daily_logs (animal_id, log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c, food, quantity, feed_time, feed_method, cast_status, misted, water, created_at, updated_at, created_by, modified_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now(), now(), $17, $17)`,
+            [finalAnimalId, finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, finalMisted, finalWater, zeroUUID]
           );
         }
         onClose();
@@ -168,12 +199,37 @@ function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData }:
           
           <>
             {logType === 'weight' && (
-              <form.Field name="weight_grams" children={(field) => (
-                <div>
-                  <label className="block text-sm mb-1 text-slate-400">Weight (grams)</label>
-                  <input type="number" name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => { const val = e.target.valueAsNumber; field.handleChange(isNaN(val) ? "" : val); }} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
+              <div className="space-y-2 p-4 bg-slate-800 rounded border border-slate-700">
+                <div className="grid grid-cols-2 gap-2">
+                   {targetUnit === 'g' && (
+                     <div>
+                        <label className="block text-sm text-slate-400">Grams</label>
+                        <input type="number" value={weightValues.g} onChange={(e) => updateWeight({...weightValues, g: Number(e.target.value)})} className="w-full bg-slate-900 p-2 rounded border border-slate-700" />
+                     </div>
+                   )}
+                   {(targetUnit === 'lb' || targetUnit === 'oz') && (
+                     <>
+                        {targetUnit === 'lb' && (
+                           <div>
+                              <label className="block text-sm text-slate-400">Pounds</label>
+                              <input type="number" value={weightValues.lb} onChange={(e) => updateWeight({...weightValues, lb: Number(e.target.value)})} className="w-full bg-slate-900 p-2 rounded border border-slate-700" />
+                           </div>
+                        )}
+                        <div>
+                           <label className="block text-sm text-slate-400">Ounces</label>
+                           <input type="number" value={weightValues.oz} onChange={(e) => updateWeight({...weightValues, oz: Number(e.target.value)})} className="w-full bg-slate-900 p-2 rounded border border-slate-700" />
+                        </div>
+                        <div>
+                           <label className="block text-sm text-slate-400">Eighths</label>
+                           <input type="number" value={weightValues.eighths} onChange={(e) => updateWeight({...weightValues, eighths: Number(e.target.value)})} className="w-full bg-slate-900 p-2 rounded border border-slate-700" />
+                        </div>
+                     </>
+                   )}
                 </div>
-              )} />
+                <div className="text-emerald-400 font-mono text-center pt-2">
+                  Total: {convertToGrams(weightValues)}g
+                </div>
+              </div>
             )}
             {['temperature'].includes(logType) && (
               <form.Field name="temperature_c" children={(field) => (
@@ -221,7 +277,31 @@ function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData }:
                   )} />
                   </>
                 )}
-            {['misting', 'events', 'flight', 'water', 'training', 'general'].includes(logType) && (
+            {['misting'].includes(logType) && (
+              <form.Field name="misted" children={(field) => (
+                <div>
+                  <label className="block text-sm mb-1 text-slate-400">Misted</label>
+                  <select name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700">
+                    <option value="N/A">N/A</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              )} />
+            )}
+            {['water'].includes(logType) && (
+              <form.Field name="water" children={(field) => (
+                <div>
+                  <label className="block text-sm mb-1 text-slate-400">Water Changed</label>
+                  <select name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700">
+                    <option value="N/A">N/A</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              )} />
+            )}
+            {['events', 'flight', 'training', 'general'].includes(logType) && (
               <form.Field name="notes" children={(field) => (
                 <div>
                   <label className="block text-sm mb-1 text-slate-400">Notes</label>

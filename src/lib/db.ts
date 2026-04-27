@@ -106,5 +106,19 @@ CREATE TABLE IF NOT EXISTS feeding_schedules (
   updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
   `);
+  
+  try {
+    await db.exec(`
+      ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS food text DEFAULT 'N/A';
+      ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS quantity numeric DEFAULT -1;
+      ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS feed_time time DEFAULT '00:00:00';
+      ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS feed_method text DEFAULT 'N/A';
+      ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS cast_status text DEFAULT 'N/A';
+      ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS misted text DEFAULT 'N/A';
+      ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS water text DEFAULT 'N/A';
+    `);
+  } catch (error) {
+    console.error('Schema migration error:', error);
+  }
 };
 
