@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet, useLocation } from '@tanstack/react-router';
+import { createRootRoute, Outlet, useLocation, Link } from '@tanstack/react-router';
 import { AuthGuard } from '../components/auth/AuthGuard';
 import { useEffect } from 'react';
 import { initDb } from '../lib/db';
@@ -51,11 +51,16 @@ function RootComponent() {
 
             <div className="px-6 pb-2 pt-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">Husbandry</div>
             <div className="px-3 space-y-1 mb-6">
-              {['Daily Logs', 'Daily Rounds', 'Tasks', 'Feeding Schedule'].map(item => (
-                <div key={item} className="flex items-center gap-3 px-3 py-2 text-slate-300 hover:text-white rounded hover:bg-slate-800/50 cursor-pointer">
+              {[
+                { label: 'Daily Logs', to: '/daily-logs' },
+                { label: 'Daily Rounds', to: '#' },
+                { label: 'Tasks', to: '#' },
+                { label: 'Feeding Schedule', to: '#' }
+              ].map(item => (
+                <Link key={item.label} to={item.to} className="flex items-center gap-3 px-3 py-2 text-slate-300 hover:text-white rounded hover:bg-slate-800/50 cursor-pointer">
                   <svg className="w-4 h-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                  <span className="text-sm font-medium">{item}</span>
-                </div>
+                  <span className="text-sm font-medium">{item.label}</span>
+                </Link>
               ))}
             </div>
 
