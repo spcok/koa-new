@@ -14,10 +14,15 @@ const formSchema = z.object({
   log_date: z.string(),
   notes: z.string().nullable().optional(),
   weight_grams: z.union([z.number(), z.string()]).nullable().optional(),
-  weight_unit: z.enum(['g', 'kg']).nullable().optional(),
+  weight_unit: z.enum(['g', 'kg', '-1']).nullable().optional(),
   basking_temp_c: z.union([z.number(), z.string()]).nullable().optional(),
   cool_temp_c: z.union([z.number(), z.string()]).nullable().optional(),
   temperature_c: z.union([z.number(), z.string()]).nullable().optional(),
+  food: z.string().nullable().optional(),
+  quantity: z.union([z.number(), z.string()]).nullable().optional(),
+  feed_time: z.string().nullable().optional(),
+  feed_method: z.string().nullable().optional(),
+  cast_status: z.string().nullable().optional(),
 });
 
 interface DailyLogModalProps {
@@ -35,16 +40,21 @@ export function DailyLogModal(props: DailyLogModalProps) {
     log_date: new Date().toISOString().slice(0, 16),
     notes: 'NONE',
     weight_grams: "" as any,
-    weight_unit: 'g',
+    weight_unit: '-1',
     basking_temp_c: "" as any,
     cool_temp_c: "" as any,
     temperature_c: "" as any,
+    food: '',
+    quantity: '',
+    feed_time: '',
+    feed_method: '',
+    cast_status: 'N/A',
   });
 
   useEffect(() => {
     if (props.existingLogId && props.isOpen) {
       setIsFetching(true);
-      db.query('SELECT log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c FROM daily_logs WHERE id = $1', [props.existingLogId]).then((res) => {
+      db.query('SELECT log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c, food, quantity, feed_time, feed_method, cast_status FROM daily_logs WHERE id = $1', [props.existingLogId]).then((res) => {
         if (res.rows[0]) {
           const row = res.rows[0];
           const parsedDate = row.log_date ? new Date(row.log_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16);
@@ -53,10 +63,15 @@ export function DailyLogModal(props: DailyLogModalProps) {
             log_date: parsedDate,
             notes: row.notes,
             weight_grams: row.weight_grams === -1 ? "" : row.weight_grams,
-            weight_unit: row.weight_unit,
+            weight_unit: row.weight_unit === '-1' ? "-1" : row.weight_unit,
             basking_temp_c: row.basking_temp_c === -1 ? "" : row.basking_temp_c,
             cool_temp_c: row.cool_temp_c === -1 ? "" : row.cool_temp_c,
             temperature_c: row.temperature_c === -1 ? "" : row.temperature_c,
+            food: row.food === 'N/A' ? "" : row.food,
+            quantity: row.quantity === -1 ? "" : row.quantity,
+            feed_time: row.feed_time === '00:00:00' ? "" : row.feed_time,
+            feed_method: row.feed_method === 'N/A' ? "" : row.feed_method,
+            cast_status: row.cast_status,
           });
         }
         setIsFetching(false);
@@ -80,34 +95,32 @@ function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData }:
     onSubmit: async ({ value }) => {
       setLoading(true);
       try {
-        const safeWeight = (value.weight_grams === "" || value.weight_grams === undefined || value.weight_grams === null) ? -1 : Number(value.weight_grams);
-        const safeBasking = (value.basking_temp_c === "" || value.basking_temp_c === undefined || value.basking_temp_c === null) ? -1 : Number(value.basking_temp_c);
-        const safeCool = (value.cool_temp_c === "" || value.cool_temp_c === undefined || value.cool_temp_c === null) ? -1 : Number(value.cool_temp_c);
-        const safeTemp = (value.temperature_c === "" || value.temperature_c === undefined || value.temperature_c === null) ? -1 : Number(value.temperature_c);
-        const safeNotes = value.notes ? String(value.notes).trim() : 'NONE';
+        const finalAnimalId = animalId || '00000000-0000-0000-0000-000000000000';
+        const finalLogType = value.log_type || 'general';
+        const finalDate = value.log_date || new Date().toISOString().slice(0, 16);
+        const finalNotes = value.notes ? String(value.notes).trim() : 'NONE';
+        const finalUnit = value.weight_unit || '-1';
+        const num = (v: any) => (v === "" || v === undefined || v === null || isNaN(Number(v))) ? -1 : Number(v);
+        const finalWeight = num(value.weight_grams);
+        const finalBasking = num(value.basking_temp_c);
+        const finalCool = num(value.cool_temp_c);
+        const finalTemp = num(value.temperature_c);
+        const finalFood = value.food ? String(value.food).trim() : 'N/A';
+        const finalQuantity = num(value.quantity);
+        const finalFeedTime = value.feed_time ? String(value.feed_time) : '00:00:00';
+        const finalFeedMethod = value.feed_method ? String(value.feed_method).trim() : 'N/A';
+        const finalCast = value.cast_status || 'N/A';
         const zeroUUID = '00000000-0000-0000-0000-000000000000';
-
-        const params = [
-          animalId,
-          value.log_type,
-          value.log_date,
-          safeNotes,
-          safeWeight,
-          value.weight_unit ?? 'g',
-          safeBasking,
-          safeCool,
-          safeTemp,
-        ];
 
         if (existingLogId) {
           await db.query(
-            `UPDATE daily_logs SET log_type = $2, log_date = $3, notes = $4, weight_grams = $5, weight_unit = $6, basking_temp_c = $7, cool_temp_c = $8, temperature_c = $9, updated_at = now(), modified_by = $11 WHERE id = $10`,
-            [...params, existingLogId, zeroUUID]
+            `UPDATE daily_logs SET log_type = $1, log_date = $2, notes = $3, weight_grams = $4, weight_unit = $5, basking_temp_c = $6, cool_temp_c = $7, temperature_c = $8, food = $9, quantity = $10, feed_time = $11, feed_method = $12, cast_status = $13, updated_at = now(), modified_by = $14 WHERE id = $15`,
+            [finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, zeroUUID, existingLogId]
           );
         } else {
           await db.query(
-            `INSERT INTO daily_logs (animal_id, log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c, created_at, updated_at, created_by, modified_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now(), $10, $10)`,
-            [...params, zeroUUID]
+            `INSERT INTO daily_logs (animal_id, log_type, log_date, notes, weight_grams, weight_unit, basking_temp_c, cool_temp_c, temperature_c, food, quantity, feed_time, feed_method, cast_status, created_at, updated_at, created_by, modified_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now(), now(), $15, $15)`,
+            [finalAnimalId, finalLogType, finalDate, finalNotes, finalWeight, finalUnit, finalBasking, finalCool, finalTemp, finalFood, finalQuantity, finalFeedTime, finalFeedMethod, finalCast, zeroUUID]
           );
         }
         onClose();
@@ -170,7 +183,45 @@ function DailyLogForm({ isOpen, onClose, animalId, existingLogId, initialData }:
                 </div>
               )} />
             )}
-            {['feed', 'misting', 'events', 'flight', 'water', 'training', 'general'].includes(logType) && (
+            {['feed'].includes(logType) && (
+              <>
+                  <form.Field name="food" children={(field) => (
+                    <div>
+                      <label className="block text-sm mb-1 text-slate-400">Food</label>
+                      <input name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
+                    </div>
+                  )} />
+                  <form.Field name="quantity" children={(field) => (
+                    <div>
+                      <label className="block text-sm mb-1 text-slate-400">Quantity</label>
+                      <input type="number" name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => { const val = e.target.valueAsNumber; field.handleChange(isNaN(val) ? "" : val); }} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
+                    </div>
+                  )} />
+                  <form.Field name="feed_time" children={(field) => (
+                    <div>
+                      <label className="block text-sm mb-1 text-slate-400">Time</label>
+                      <input type="time" name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
+                    </div>
+                  )} />
+                   <form.Field name="feed_method" children={(field) => (
+                    <div>
+                      <label className="block text-sm mb-1 text-slate-400">Method</label>
+                      <input name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700" />
+                    </div>
+                  )} />
+                  <form.Field name="cast_status" children={(field) => (
+                    <div>
+                      <label className="block text-sm mb-1 text-slate-400">Cast Status</label>
+                      <select name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} className="w-full bg-slate-800 p-2 rounded border border-slate-700">
+                        <option value="N/A">N/A</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                    </div>
+                  )} />
+                  </>
+                )}
+            {['misting', 'events', 'flight', 'water', 'training', 'general'].includes(logType) && (
               <form.Field name="notes" children={(field) => (
                 <div>
                   <label className="block text-sm mb-1 text-slate-400">Notes</label>
