@@ -33,7 +33,7 @@ function DailyLogsPage() {
 
   const getLogs = (animalId: string, logType: string) => {
     return data?.logs
-      .filter((l: any) => l.animal_id === animalId && l.log_type === logType)
+      .filter((l: any) => l.animal_id === animalId && l.log_type.toLowerCase() === logType.toLowerCase())
       .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || [];
   };
 
@@ -45,24 +45,38 @@ function DailyLogsPage() {
   };
 
   const renderCell = (animal: any, logType: string) => {
-    const logs = getLogs(animal.id, logType);
-    const isMammalFeed = activeCategory === 'Mammals' && logType === 'feed';
+    const type = logType.toLowerCase();
+    const logs = getLogs(animal.id, type);
+    const isMammalFeed = activeCategory === 'Mammals' && type === 'feed';
     const displayLogs = isMammalFeed ? logs : logs.slice(0, 1);
 
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 min-w-[120px]">
         {displayLogs.map((log: any) => {
-          const text = logType === 'feed' 
-            ? `${log.quantity !== -1 ? log.quantity + 'x ' : ''}${log.food !== 'N/A' ? log.food : log.value}` 
-            : log.value;
-          const time = log.feed_time !== '00:00:00' 
+          let text = log.value || '';
+          
+          if (type === 'feed') {
+             const qty = log.quantity && log.quantity !== -1 ? log.quantity + 'x ' : '';
+             const food = log.food && log.food !== 'N/A' ? log.food : '';
+             text = `${qty}${food}`.trim() || log.value || 'Done';
+          } else if (type === 'weight') {
+             text = log.weight_grams && log.weight_grams !== -1 ? `${log.weight_grams}g` : log.value;
+          } else if (type === 'temperature') {
+             text = log.temperature_c != null ? `${log.temperature_c}°C` : log.value;
+          } else if (type === 'misting') {
+             text = log.misted && log.misted !== 'N/A' ? log.misted : log.value || 'Yes';
+          } else if (type === 'water') {
+             text = log.water && log.water !== 'N/A' ? log.water : log.value || 'Yes';
+          }
+
+          const time = log.feed_time && log.feed_time !== '00:00:00' 
             ? log.feed_time.substring(0, 5) 
             : new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
           return (
             <button
               key={log.id}
-              onClick={() => handleOpenModal(animal.id, logType, log.id)}
+              onClick={() => handleOpenModal(animal.id, type, log.id)}
               className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-2 rounded-lg text-xs font-bold text-left hover:bg-indigo-100 transition-colors w-full"
             >
               <span className="block truncate">{text}</span>
@@ -73,7 +87,7 @@ function DailyLogsPage() {
 
         {(logs.length === 0 || isMammalFeed) && (
           <button
-            onClick={() => handleOpenModal(animal.id, logType)}
+            onClick={() => handleOpenModal(animal.id, type)}
             className="flex items-center gap-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200 px-3 py-2 rounded-lg text-xs font-bold transition-colors w-full"
           >
             <Plus size={14} /> Add
@@ -101,7 +115,7 @@ function DailyLogsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">DAILY LOG</h1>
@@ -121,18 +135,18 @@ function DailyLogsPage() {
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg transition-colors ${activeCategory === cat ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg transition-colors whitespace-nowrap ${activeCategory === cat ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             {cat}
           </button>
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[600px]">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="p-4 text-xs font-semibold text-slate-900 uppercase w-1/4">Animal Name</th>
+              <th className="p-4 text-xs font-semibold text-slate-900 uppercase min-w-[150px]">Animal Name</th>
               {headers.map(h => <th key={h} className="p-4 text-xs font-semibold text-slate-900 uppercase">{h}</th>)}
             </tr>
           </thead>
@@ -144,9 +158,9 @@ function DailyLogsPage() {
             ) : (
               filteredAnimals.map((animal: any) => (
                 <tr key={animal.id} className="hover:bg-slate-50/50">
-                  <td className="p-4 text-sm font-bold text-slate-900">{animal.name}</td>
+                  <td className="p-4 text-sm font-bold text-slate-900 align-top">{animal.name}</td>
                   {headers.map(h => (
-                    <td key={h} className="p-4 align-top w-1/5">
+                    <td key={h} className="p-4 align-top">
                       {renderCell(animal, h.toLowerCase())}
                     </td>
                   ))}
