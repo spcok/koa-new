@@ -52,7 +52,7 @@ function DbDailyLogsDiagnostics() {
             <thead className="text-xs uppercase bg-slate-900 border-b border-slate-700">
               <tr>
                 {headers.map(key => <th key={key} className="px-4 py-3">{key}</th>)}
-                <th className="px-4 py-3">Actions</th>
+                <th className="px-4 py-3 sticky right-0 bg-slate-900 z-10 w-24">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -60,10 +60,14 @@ function DbDailyLogsDiagnostics() {
                 <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-900/50">
                   {headers.map(key => (
                     <td key={key} className="px-4 py-3 whitespace-nowrap text-xs">
-                      {typeof log[key] === 'object' ? JSON.stringify(log[key]) : String(log[key])}
+                      {key === 'notes' && typeof log[key] === 'string' && log[key].length > 30 ? (
+                        <div className="max-w-[150px] truncate" title={String(log[key])}>{log[key]}</div>
+                      ) : (
+                        typeof log[key] === 'object' ? JSON.stringify(log[key]) : String(log[key])
+                      )}
                     </td>
                   ))}
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 sticky right-0 bg-slate-950 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)] z-10">
                     <button 
                       onClick={() => { setEditingLogId(log.id); setIsModalOpen(true); }}
                       className="text-blue-400 hover:text-blue-300 text-xs font-semibold"
