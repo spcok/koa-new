@@ -5,6 +5,7 @@ import { db } from '../lib/db';
 interface SyncState {
   isSyncing: boolean;
   lastSyncedAt: Date | null;
+  realtimeChannel: any | null;
   pullFromCloud: () => Promise<void>;
   pushToCloud: () => Promise<void>;
   syncAll: () => Promise<void>;
@@ -14,6 +15,7 @@ interface SyncState {
 export const useSyncStore = create<SyncState>((set, get) => ({
   isSyncing: false,
   lastSyncedAt: null,
+  realtimeChannel: null,
   pushToCloud: async () => {
     const { rows: localLogs } = await db.query('SELECT * FROM daily_logs');
     if (localLogs.length > 0) {
@@ -105,7 +107,12 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     }
   },
   initRealtimeSubscription: () => {
-    supabase.channel('public:daily_logs')
+    if (get().realtimeChannel) return;
+
+    const channel = supabase.channel('public:daily_logs');
+    set({ realtimeChannel: channel });
+
+    channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_logs' }, async (payload) => {
         console.log('Realtime payload received:', payload);
 
