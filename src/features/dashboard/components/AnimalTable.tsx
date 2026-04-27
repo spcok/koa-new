@@ -14,7 +14,7 @@ export function AnimalTable() {
     if (categoryFilter === 'ARCHIVED') {
       whereClause = 'WHERE archived = true';
     } else if (categoryFilter !== 'ALL') {
-      whereClause = 'WHERE category = $1 AND archived = false';
+      whereClause = 'WHERE UPPER(category) = UPPER($1) AND archived = false';
       params.push(categoryFilter);
     }
 

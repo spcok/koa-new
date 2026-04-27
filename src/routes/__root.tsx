@@ -2,6 +2,8 @@ import { createRootRoute, Outlet, useLocation } from '@tanstack/react-router';
 import { AuthGuard } from '../components/auth/AuthGuard';
 import { useEffect } from 'react';
 import { initDb } from '../lib/db';
+import { useAuthStore } from '../store/authStore';
+import { useSyncStore } from '../store/syncStore';
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -9,10 +11,18 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   const location = useLocation();
+  const { session } = useAuthStore();
+  const { pullFromCloud } = useSyncStore();
 
   useEffect(() => {
     initDb().catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (session) {
+      pullFromCloud().catch(console.error);
+    }
+  }, [session, pullFromCloud]);
 
   if (location.pathname === '/login') {
     return (

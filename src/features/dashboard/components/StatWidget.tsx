@@ -31,7 +31,7 @@ export function StatWidget({ title, current, total, type }: StatWidgetProps) {
     if (categoryFilter === 'ARCHIVED') {
       whereClause = "animals.archived = true";
     } else if (categoryFilter !== 'ALL') {
-      whereClause = `animals.category = $${paramIndex} AND animals.archived = false`;
+      whereClause = `UPPER(animals.category) = UPPER($${paramIndex}) AND animals.archived = false`;
       params.push(categoryFilter);
       paramIndex++;
     }

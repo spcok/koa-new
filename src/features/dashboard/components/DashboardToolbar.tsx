@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar as CalendarIcon, ArrowUpDown, Plus } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import clsx from 'clsx';
 import { AddAnimalModal } from '../../animals/components/AddAnimalModal';
 import { useDashboardStore, CategoryFilter } from '../../../store/dashboardStore';
@@ -58,22 +59,30 @@ export function DashboardToolbar() {
         </div>
 
         {/* Category Filters Row */}
-        <div className="flex items-center justify-between text-sm font-semibold text-slate-500 bg-white/50 rounded-full border border-slate-200 overflow-hidden shadow-sm p-1">
-          {tabs.map((tab) => {
-            const isActive = categoryFilter === tab.value;
-            return (
-              <button
-                key={tab.value}
-                onClick={() => setCategoryFilter(tab.value)}
-                className={clsx(
-                  "flex-1 py-2 text-center rounded-full transition-colors",
-                  isActive ? "bg-white text-slate-800 shadow-sm border border-slate-200" : "hover:bg-white/50"
-                )}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-1 items-center justify-between text-sm font-semibold text-slate-500 bg-white/50 rounded-full border border-slate-200 overflow-hidden shadow-sm p-1">
+            {tabs.map((tab) => {
+              const isActive = categoryFilter === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setCategoryFilter(tab.value)}
+                  className={clsx(
+                    "flex-1 py-2 text-center rounded-full transition-colors",
+                    isActive ? "bg-white text-slate-800 shadow-sm border border-slate-200" : "hover:bg-white/50"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+          <Link
+            to="/dev/db"
+            className="flex-shrink-0 text-xs uppercase tracking-wider text-slate-400 border border-slate-700 bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded transition-colors"
+          >
+            Dev: View Local DB
+          </Link>
         </div>
       </div>
 
