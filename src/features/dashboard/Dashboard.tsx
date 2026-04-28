@@ -248,9 +248,13 @@ export function Dashboard() {
                 const standalone: any[] = [];
                 
                 filteredAnimals.forEach((animal: any) => {
-                  if (animal.parent_mob_id) {
-                    if (!grouped.has(animal.parent_mob_id)) grouped.set(animal.parent_mob_id, []);
-                    grouped.get(animal.parent_mob_id)!.push(animal);
+                  const pid = animal.parent_mob_id;
+                  // Strict check: Ignore zero-UUID default
+                  const isFakeParent = !pid || pid === '00000000-0000-0000-0000-000000000000';
+                  
+                  if (!isFakeParent) {
+                    if (!grouped.has(pid)) grouped.set(pid, []);
+                    grouped.get(pid)!.push(animal);
                   } else {
                     standalone.push(animal);
                   }
@@ -260,8 +264,9 @@ export function Dashboard() {
 
                 Array.from(grouped.entries()).forEach(([parentMobId, animals]: [string, any[]]) => {
                   const isExpanded = expandedGroups[parentMobId];
-                  const parentMob = standalone.find((a: any) => a.id === parentMobId);
-                  const displayName = parentMob ? parentMob.name : 'Grouped Animals';
+                  // Look up the parent in the UNFILTERED data array so it finds the name even if the parent is in a different category tab
+                  const parentMob = data?.animals?.find((a: any) => String(a.id) === String(parentMobId));
+                  const displayName = parentMob ? parentMob.name : 'Unknown Mob';
                   
                   rows.push(
                     <tr key={`group-${parentMobId}`} className="bg-slate-100/50 border-y border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => toggleGroup(parentMobId)}>
@@ -307,6 +312,7 @@ export function Dashboard() {
                   }
                 });
 
+                // Render standalone animals, ensuring we don't render a parent mob as a standalone row if it's already acting as a group folder
                 standalone.filter((a: any) => !grouped.has(a.id)).forEach((animal: any) => {
                   rows.push(
                     <tr key={animal.id} className="hover:bg-slate-50">
