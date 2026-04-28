@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { createRoute } from '@tanstack/react-router';
 import { Calendar, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
@@ -28,6 +28,12 @@ function DailyLogsPage() {
       return { animals: animalsRes.rows, logs: logsRes.rows };
     }
   });
+
+  useEffect(() => {
+    const handleDbUpdate = () => refetch();
+    window.addEventListener('db-updated', handleDbUpdate);
+    return () => window.removeEventListener('db-updated', handleDbUpdate);
+  }, [refetch]);
 
   const filteredAnimals = data?.animals.filter((a: any) => a.category.toLowerCase() === activeCategory.toLowerCase()) || [];
 

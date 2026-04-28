@@ -118,6 +118,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
 
         if (payload.eventType === 'DELETE') {
           await db.query('DELETE FROM daily_logs WHERE id = $1', [payload.old.id]);
+          window.dispatchEvent(new Event('db-updated'));
         } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           // Destructure the new record
           const record = payload.new;
@@ -136,6 +137,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
             ON CONFLICT (id) DO UPDATE SET ${updateSet};
           `;
           await db.query(query, values);
+          window.dispatchEvent(new Event('db-updated'));
         }
       })
       .subscribe();
