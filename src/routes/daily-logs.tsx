@@ -121,7 +121,7 @@ function DailyLogsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">DAILY LOG</h1>
