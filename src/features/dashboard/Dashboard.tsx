@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { db } from '../../lib/db';
 import { Heart, AlertCircle, Plus, Calendar, Scale, Drumstick, ArrowUpDown, Loader2, ClipboardCheck, CheckCircle, ChevronUp, ChevronDown, ChevronRight, Lock, Unlock } from 'lucide-react';
 
 export function Dashboard() {
+  const getLocalToday = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const [activeTab, setActiveTab] = useState('Owls');
-  const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [viewDate, setViewDate] = useState(getLocalToday());
   const [isBentoMinimized, setIsBentoMinimized] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [sortOption, setSortOption] = useState<'alpha-asc' | 'alpha-desc'>('alpha-asc');
@@ -16,29 +24,76 @@ export function Dashboard() {
   const cycleSort = () => setSortOption(prev => prev === 'alpha-asc' ? 'alpha-desc' : 'alpha-asc');
   const toggleGroup = (groupName: string) => setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['dashboardData', viewDate],
     queryFn: async () => {
       const animalsRes = await db.query("SELECT * FROM animals ORDER BY name ASC");
-      const logsRes = await db.query("SELECT * FROM daily_logs WHERE DATE(log_date) <= $1 ORDER BY created_at DESC", [viewDate]);
+      const logsRes = await db.query("SELECT * FROM daily_logs ORDER BY log_date DESC");
       return { animals: animalsRes.rows, logs: logsRes.rows };
     }
   });
 
+  useEffect(() => {
+    const handleDbUpdate = () => refetch();
+    window.addEventListener('db-updated', handleDbUpdate);
+    return () => window.removeEventListener('db-updated', handleDbUpdate);
+  }, [refetch]);
+
+  const parseLocalDate = (val: any) => {
+    if (!val) return '';
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val).substring(0, 10);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    } catch {
+      return String(val).substring(0, 10);
+    }
+  };
+
   const getWeightDisplay = (log: any) => {
       if (!log) return '-';
-      if (log.weight_grams && log.weight_grams !== -1) return `${log.weight_grams}g`;
-      if (log.value) return String(log.value);
+      const wg = Number(log.weight_grams);
+      if (!isNaN(wg) && wg !== -1 && wg !== 0) return `${wg}g`;
+      if (log.value && log.value !== 'N/A' && log.value !== 'NONE') return String(log.value);
       return '-';
+  };
+
+  const renderFeedLogs = (logs: any[]) => {
+      if (!logs || logs.length === 0) return '-';
+      return (
+        <div className="flex flex-col gap-1.5">
+          {logs.map((log: any) => {
+            const qty = log.quantity && log.quantity !== -1 ? log.quantity + 'x ' : '';
+            const food = log.food && log.food !== 'N/A' ? log.food : '';
+            const text = `${qty}${food}`.trim() || log.value || 'Fed';
+            const time = log.feed_time && log.feed_time !== '00:00:00' 
+              ? log.feed_time.substring(0, 5) 
+              : new Date(log.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            
+            return (
+              <span key={log.id} className="block whitespace-normal break-words leading-tight text-slate-700 font-medium">
+                {text} <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">@ {time}</span>
+              </span>
+            );
+          })}
+        </div>
+      );
   };
 
   // 1. Process & Map Animals
   const processedAnimals = (data?.animals || []).map((a: any) => {
-    const todayLogs = data?.logs.filter((l: any) => l.animal_id === a.id && l.log_date.startsWith(viewDate)) || [];
-    const todayWeight = todayLogs.find((l: any) => l.log_type === 'weight');
-    const todayFeedLogs = todayLogs.filter((l: any) => l.log_type === 'feed');
+    const animalLogs = data?.logs.filter((l: any) => String(l.animal_id) === String(a.id)) || [];
+    const todayLogs = animalLogs.filter((l: any) => parseLocalDate(l.log_date) === viewDate);
     
-    const pastFeedLogs = data?.logs.filter((l: any) => l.animal_id === a.id && l.log_type === 'feed' && l.log_date < viewDate) || [];
+    const todayWeight = todayLogs.find((l: any) => String(l.log_type).toLowerCase() === 'weight');
+    const todayFeedLogs = todayLogs.filter((l: any) => String(l.log_type).toLowerCase() === 'feed');
+    
+    const pastFeedLogs = animalLogs.filter((l: any) => 
+        String(l.log_type).toLowerCase() === 'feed' && parseLocalDate(l.log_date) < viewDate
+    );
     const lastFedLog = pastFeedLogs.length > 0 ? pastFeedLogs[0] : null; 
 
     return {
@@ -181,7 +236,7 @@ export function Dashboard() {
               <Calendar size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
             <button onClick={() => { const d = new Date(viewDate); d.setDate(d.getDate() + 1); setViewDate(d.toISOString().split('T')[0]); }} className="px-2 py-1 border border-slate-200 rounded-lg text-[10px] lg:text-xs hover:bg-slate-50 whitespace-nowrap flex-1 sm:flex-none text-center">Next →</button>
-            <button onClick={() => setViewDate(new Date().toISOString().split('T')[0])} className="px-2 py-1 border border-slate-200 rounded-lg text-[10px] lg:text-xs hover:bg-slate-50 whitespace-nowrap flex-1 sm:flex-none text-center">Today</button>
+            <button onClick={() => setViewDate(getLocalToday())} className="px-2 py-1 border border-slate-200 rounded-lg text-[10px] lg:text-xs hover:bg-slate-50 whitespace-nowrap flex-1 sm:flex-none text-center">Today</button>
           </div>
         </div>
         
@@ -235,7 +290,7 @@ export function Dashboard() {
                 ) : (
                     <>
                         <th className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs ${activeTab === 'Exotics' ? 'hidden' : ''}`}>Today's Weight</th>
-                        <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs">Today's Feed</th>
+                        <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs min-w-[140px]">Today's Feed</th>
                         <th className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs ${activeTab === 'Exotics' ? 'hidden' : 'hidden md:table-cell'}`}>Last Fed</th>
                         <th className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-[11px] md:text-xs hidden md:table-cell">Location</th>
                     </>
@@ -249,7 +304,6 @@ export function Dashboard() {
                 
                 filteredAnimals.forEach((animal: any) => {
                   const pid = animal.parent_mob_id;
-                  // Strict check: Ignore zero-UUID default
                   const isFakeParent = !pid || pid === '00000000-0000-0000-0000-000000000000';
                   
                   if (!isFakeParent) {
@@ -264,7 +318,6 @@ export function Dashboard() {
 
                 Array.from(grouped.entries()).forEach(([parentMobId, animals]: [string, any[]]) => {
                   const isExpanded = expandedGroups[parentMobId];
-                  // Look up the parent in the UNFILTERED data array so it finds the name even if the parent is in a different category tab
                   const parentMob = data?.animals?.find((a: any) => String(a.id) === String(parentMobId));
                   const displayName = parentMob ? parentMob.name : 'Unknown Mob';
                   
@@ -296,11 +349,11 @@ export function Dashboard() {
                               </>
                           ) : (
                               <>
-                                  <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-slate-400 ${activeTab === 'Exotics' ? 'hidden' : ''}`}>
+                                  <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-slate-700 font-medium ${activeTab === 'Exotics' ? 'hidden' : ''}`}>
                                     {getWeightDisplay(animal.todayWeight)}
                                   </td>
                                   <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-slate-400">
-                                    {animal.todayFeedLogs.length > 0 ? `${animal.todayFeedLogs.length} Feed(s)` : '-'}
+                                    {renderFeedLogs(animal.todayFeedLogs)}
                                   </td>
                                   <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-slate-400 ${activeTab === 'Exotics' ? 'hidden' : 'hidden md:table-cell'}`}>{animal.lastFedStr}</td>
                                   <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-emerald-500 hidden md:table-cell">{animal.location || 'Unknown'}</td>
@@ -312,7 +365,6 @@ export function Dashboard() {
                   }
                 });
 
-                // Render standalone animals, ensuring we don't render a parent mob as a standalone row if it's already acting as a group folder
                 standalone.filter((a: any) => !grouped.has(a.id)).forEach((animal: any) => {
                   rows.push(
                     <tr key={animal.id} className="hover:bg-slate-50">
@@ -326,11 +378,11 @@ export function Dashboard() {
                           </>
                       ) : (
                           <>
-                              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-slate-400 ${activeTab === 'Exotics' ? 'hidden' : ''}`}>
+                              <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-slate-700 font-medium ${activeTab === 'Exotics' ? 'hidden' : ''}`}>
                                 {getWeightDisplay(animal.todayWeight)}
                               </td>
                               <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-slate-400">
-                                {animal.todayFeedLogs.length > 0 ? `${animal.todayFeedLogs.length} Feed(s)` : '-'}
+                                {renderFeedLogs(animal.todayFeedLogs)}
                               </td>
                               <td className={`px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-slate-400 ${activeTab === 'Exotics' ? 'hidden' : 'hidden md:table-cell'}`}>{animal.lastFedStr}</td>
                               <td className="px-1 py-2 md:px-2 md:py-3 lg:px-4 lg:py-4 text-xs text-emerald-500 hidden md:table-cell">{animal.location || 'Unknown'}</td>
